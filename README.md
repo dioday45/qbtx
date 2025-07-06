@@ -70,16 +70,16 @@ data/                        # Place your price data files here (e.g., BTCUSDT.c
 
 ## 📊 Features
 
-- 🧠 **Strategy Abstraction**  
+- 🧠 **Strategy Abstraction**
   Build new strategies by subclassing a base strategy class.
 
-- ⚡ **Vectorized Execution**  
+- ⚡ **Vectorized Execution**
   Efficient portfolio simulation using `pandas`.
 
-- 📈 **Comprehensive Analytics**  
+- 📈 **Comprehensive Analytics**
   Cumulative returns, drawdown, and annual Sharpe ratio plotted with Plotly.
 
-- 🔌 **Modular Design**  
+- 🔌 **Modular Design**
   Clear separation between engine, data, strategy, and reporting.
 
 ---
@@ -92,5 +92,5 @@ This project is licensed under the MIT License.
 
 ## 🤝 Contributing
 
-Open to pull requests and contributions!  
+Open to pull requests and contributions!
 Feel free to suggest features, enhancements, or new strategy modules.

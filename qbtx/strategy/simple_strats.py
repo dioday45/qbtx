@@ -1,6 +1,7 @@
-from qbtx.strategy.base import Strategy
 import numpy as np
 import pandas as pd
+
+from qbtx.strategy.base import Strategy
 
 
 class BuyAndHoldStrategy(Strategy):

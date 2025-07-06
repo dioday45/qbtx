@@ -1,7 +1,8 @@
 from abc import ABC, abstractmethod
-import pandas as pd
+from typing import Dict, Optional, Union
+
 import numpy as np
-from typing import Dict, Union, Optional
+import pandas as pd
 from tqdm import tqdm
 
 
@@ -250,9 +251,6 @@ class Backtester:
         results = {}
 
         for ticker, backtest in self.asset_backtests.items():
-            # Performance metrics
-            performance = evaluate_returns(backtest.returns.to_frame(ticker))
-
             # Trade statistics
             trade_stats = evaluate_trade_log(backtest.trade_log.get_trades())
 

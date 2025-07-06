@@ -1,5 +1,6 @@
-from qbtx.dataloader.loader import Loader
 import pandas as pd
+
+from qbtx.dataloader.loader import Loader
 
 
 class CoinGeckoLoader(Loader):

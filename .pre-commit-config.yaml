@@ -1,0 +1,41 @@
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+
+  - repo: https://github.com/charliermarsh/ruff-pre-commit
+    rev: v0.8.0
+    hooks:
+      - id: ruff
+        types_or: [ python, pyi, jupyter ]
+        args: ["--fix", "--ignore", "E501,F821" ]
+        exclude: ^archives
+        exclude: ^bloomberg_remote/
+        exclude: ^data/
+        exclude: ^docs/
+        exclude: ^examples/
+        exclude: ^tests/
+        exclude: ^.ipynb_checkpoints/
+
+  - repo: https://github.com/pycqa/isort
+    rev: 5.13.2
+    hooks:
+      - id: isort
+        args: ["--profile", "black"]
+
+  - repo: https://github.com/psf/black-pre-commit-mirror
+    rev: 24.10.0
+    hooks:
+      - id: black
+
+  - repo: https://github.com/psf/black-pre-commit-mirror
+    rev: 24.10.0
+    hooks:
+      - id: black-jupyter
+
+  - repo: https://github.com/keewis/blackdoc
+    rev: v0.3.9
+    hooks:
+    - id: blackdoc

@@ -1,10 +1,11 @@
 from typing import Union
-import pandas as pd
+
 import numpy as np
-import yfinance as yf
-import plotly.graph_objects as go
-from plotly.subplots import make_subplots
+import pandas as pd
 import plotly.express as px
+import plotly.graph_objects as go
+import yfinance as yf
+from plotly.subplots import make_subplots
 
 
 class PerformanceReport:
@@ -96,7 +97,7 @@ class PerformanceReport:
                 return 52
             elif freq and "M" in freq:
                 return 12
-        except:
+        except Exception:
             pass
         return 252  # Default to daily
 
@@ -106,7 +107,7 @@ class PerformanceReport:
             tnx = yf.download("^TNX", auto_adjust=True, progress=False)
             if not tnx.empty:
                 return tnx["Close"].dropna().iloc[-1] / 100
-        except:
+        except Exception:
             pass
         return 0.02  # Default 2%
 

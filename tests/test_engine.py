@@ -1,10 +1,11 @@
-import pandas as pd
 import numpy as np
+import pandas as pd
 import pytest
+
+from qbtx.engine.backtester import Backtester
 from qbtx.engine.portfolio import Portfolio
 from qbtx.engine.tradelog import TradeLog
 from qbtx.strategy.simple_strats import ReversalStrategy
-from qbtx.engine.backtester import Backtester
 
 # ---------- Fixtures ----------
 
