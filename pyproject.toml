@@ -1,0 +1,38 @@
+[tool.poetry]
+name = "qbtx"
+version = "0.1.0"
+description = "Backtesting framework for trading strategies"
+authors = ["Jeremy Di Dio <65977803+dioday45@users.noreply.github.com>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = ">=3.11, < 4.0"
+numpy = "^2.3.0"
+pandas = "^2.3.0"
+seaborn = "^0.13.2"
+matplotlib = "^3.10.3"
+scikit-learn = "^1.7.0"
+ccxt = "^4.4.89"
+yfinance = "^0.2.63"
+plotly = "^6.1.2"
+nbformat = "^5.10.4"
+pyarrow = "^20.0.0"
+tqdm = "^4.67.1"
+requests = "^2.32.4"
+polygon-api-client = "^1.14.6"
+binance-historical-data = "^0.1.14"
+quantstats-lumi = "^1.0.1"
+ipython = "^9.3.0"
+
+
+[tool.poetry.group.dev.dependencies]
+ipykernel = "^6.29.5"
+
+# pyproject.toml
+pytest = "^8.4.0"
+[tool.pytest.ini_options]
+python_files = "test_*.py"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
