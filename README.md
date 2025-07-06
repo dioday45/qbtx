@@ -10,7 +10,7 @@ It allows you to:
 
 ---
 
-## 📦 Setup with Poetry
+## Setup with Poetry
 
 Install dependencies and create the virtual environment:
 
@@ -20,7 +20,7 @@ poetry install
 
 ---
 
-## 📂 Data Setup
+## Data Setup
 
 Create a `data/` directory in the project root and place your historical data files there.
 
@@ -36,7 +36,7 @@ This dataset provides cleaned OHLCV historical data for Binance spot and futures
 
 ---
 
-## 🚀 Quick Start
+## Quick Start
 
 Run the sample strategy notebook:
 
@@ -52,7 +52,7 @@ This shows how to:
 
 ---
 
-## 🧱 Project Structure
+## Project Structure
 
 ```
 qbtx/
@@ -68,29 +68,29 @@ data/                        # Place your price data files here (e.g., BTCUSDT.c
 
 ---
 
-## 📊 Features
+## Features
 
-- 🧠 **Strategy Abstraction**
+- **Strategy Abstraction**
   Build new strategies by subclassing a base strategy class.
 
-- ⚡ **Vectorized Execution**
+- **Vectorized Execution**
   Efficient portfolio simulation using `pandas`.
 
-- 📈 **Comprehensive Analytics**
+- **Comprehensive Analytics**
   Cumulative returns, drawdown, and annual Sharpe ratio plotted with Plotly.
 
-- 🔌 **Modular Design**
+- **Modular Design**
   Clear separation between engine, data, strategy, and reporting.
 
 ---
 
-## 📄 License
+## License
 
 This project is licensed under the MIT License.
 
 ---
 
-## 🤝 Contributing
+## Contributing
 
 Open to pull requests and contributions!
 Feel free to suggest features, enhancements, or new strategy modules.
