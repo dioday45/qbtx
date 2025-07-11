@@ -88,6 +88,7 @@ class BinanceDataLoader:
         interval: str = "1d",
         symbols: Optional[List[str]] = None,
         columns: Optional[List[str]] = None,
+        min_years: int = 4,
     ) -> Dict[str, pd.DataFrame]:
         """
         Load data for specified symbols or all symbols for a given interval.
@@ -127,6 +128,15 @@ class BinanceDataLoader:
                                 ignore_index=False,
                             ).sort_index()
                             results[sym_dir.name] = df[columns] if columns else df
+
+        if results:
+            min_days = min_years * 365
+            # Use dictionary comprehension for efficiency
+            results = {
+                symbol: df
+                for symbol, df in results.items()
+                if df.index.nunique() >= min_days
+            }
 
         return results
 

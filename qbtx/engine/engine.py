@@ -204,8 +204,13 @@ class TradeLog:
                     entry_time, entry_price = None, None
 
                 current_position = p
-
-        return pd.DataFrame(trades)
+        trades = pd.DataFrame(trades)
+        if not trades.empty:
+            trades = trades.dropna(subset=["entry_time", "exit_time"])
+            trades["entry_time"] = pd.to_datetime(trades["entry_time"])
+            trades["exit_time"] = pd.to_datetime(trades["exit_time"])
+            trades = trades.sort_values(by="entry_time").reset_index(drop=True)
+        return trades
 
     def get_trades(self) -> pd.DataFrame:
         """Return the DataFrame of completed trades.
@@ -308,6 +313,7 @@ class Backtester:
         strategy_kwargs: Optional[Dict[str, Any]] = None,
         slippage: float = 0.0,
         fee: float = 0.0,
+        verbose: bool = True,
     ) -> None:
         """Initialize Backtester with portfolio, strategy, and cost parameters.
 
@@ -324,6 +330,7 @@ class Backtester:
         self.slippage = slippage
         self.fee = fee
         self.asset_backtests: Dict[str, AssetBacktest] = {}
+        self.verbose = verbose
 
     def run(self) -> "Backtester":
         """Run backtests for all assets in the portfolio.
@@ -331,7 +338,11 @@ class Backtester:
         Returns:
             Backtester: Self for chaining.
         """
-        for ticker in tqdm(self.portfolio.get_all_tickers(), desc="Running backtests"):
+        for ticker in tqdm(
+            self.portfolio.get_all_tickers(),
+            desc="Running backtests",
+            disable=not self.verbose,
+        ):
             data = self.portfolio.get_asset_data(ticker)
             strategy = self.strategy(**self.strategy_kwargs)
 
@@ -365,7 +376,6 @@ class Backtester:
                 "trades": backtest.trade_log.get_trades(),
                 "trade_stats": trade_stats,
                 "signals": backtest.signals,
-                "positions": backtest.positions,
             }
 
         return results
