@@ -7,20 +7,21 @@ import plotly.graph_objects as go
 import yfinance as yf
 from plotly.subplots import make_subplots
 
+from qbtx.evaluate.metrics import profit_factor, sharpe_ratio, sortino_ratio, win_rate
+
 
 class PerformanceReport:
     def __init__(
         self,
         strategy_returns: pd.Series,
         benchmark: Union[str, pd.Series, None],
-        strategy_name: str = "Strategy",
     ):
-        self.strategy_name = strategy_name
         self.strategy_returns = strategy_returns
         self.benchmark_input = benchmark
         self.benchmark_returns = None
         self.cumulative = None
         self.drawdown = None
+        self.names = ["Strategy", "Benchmark"]
 
         self._validate_inputs()
         self._prepare_data()
@@ -42,9 +43,7 @@ class PerformanceReport:
             if self.benchmark_returns.name is None:
                 self.benchmark_returns.name = "Benchmark"
 
-        # Set names
-        self.strategy_returns.name = self.strategy_name
-
+        self.strategy_returns.name = "Strategy"
         self.df = pd.merge(
             self.strategy_returns,
             self.benchmark_returns,
@@ -52,6 +51,7 @@ class PerformanceReport:
             left_index=True,
             right_index=True,
         )
+        self.df.columns = self.names
         self.df.fillna(0, inplace=True)
 
         self.df = self.df.sort_index()
@@ -90,9 +90,9 @@ class PerformanceReport:
         try:
             freq = pd.infer_freq(self.df.index)
             if freq and ("D" in freq or "B" in freq):
-                return 252
+                return 365
             elif freq and "H" in freq:
-                return 252 * 24
+                return 365 * 24
             elif freq and "W" in freq:
                 return 52
             elif freq and "M" in freq:
@@ -101,24 +101,15 @@ class PerformanceReport:
             pass
         return 252  # Default to daily
 
-    def _get_risk_free_rate(self):
-        """Get risk-free rate from 10Y Treasury"""
-        try:
-            tnx = yf.download("^TNX", auto_adjust=True, progress=False)
-            if not tnx.empty:
-                return tnx["Close"].dropna().iloc[-1] / 100
-        except Exception:
-            pass
-        return 0.02  # Default 2%
-
-    def compute_summary_metrics(self, starting_money: float = 10000) -> pd.DataFrame:
+    def compute_summary_metrics(self) -> pd.DataFrame:
         """Compute summary metrics using instance data"""
         ann_factor = self._get_annualization_factor()
-        risk_free_rate = self._get_risk_free_rate()
 
         summary = {}
 
-        for col in self.df.columns:  # Reverse order to have strategy first
+        for i, col in enumerate(
+            self.df.columns
+        ):  # Reverse order to have strategy first
             returns = self.df[col]
             cumulative = self.cumulative[col]
             drawdown = self.drawdown[col]
@@ -129,44 +120,37 @@ class PerformanceReport:
             duration_weeks = (end_date - start_date).days / 7
 
             # Return metrics
-            total_return = cumulative.iloc[-1] - 1
-            annual_return = (1 + total_return) ** (ann_factor / len(returns)) - 1
+            annual_return = ((1 + returns).prod()) ** (ann_factor / len(returns)) - 1
             annual_volatility = returns.std() * np.sqrt(ann_factor)
+            total_return = cumulative.iloc[-1] - 1
 
             # Risk metrics
-            sharpe_ratio = (
-                (annual_return - risk_free_rate) / annual_volatility
-                if annual_volatility > 0
-                else 0
-            )
+            sharpe = sharpe_ratio(returns, ann_factor)
+            sortino = sortino_ratio(returns, ann_factor)
+            pf = profit_factor(returns)
             max_drawdown = drawdown.min()
-
-            # Value metrics
-            start_value = starting_money
-            final_value = starting_money * cumulative.iloc[-1]
-            peak_value = starting_money * cumulative.max()
+            winrate = win_rate(returns)
 
             # Correlation (only meaningful for strategy vs benchmark)
-            if col == self.strategy_name and len(self.df.columns) > 1:
+            if col == self.names[0] and len(self.df.columns) > 1:
                 other_col = [c for c in self.df.columns if c != col][0]
                 correlation = self.df[col].corr(self.df[other_col])
                 if pd.isna(correlation):
                     correlation = 0.0
             else:
-                correlation = 1.0 if col != self.strategy_name else 0.0
+                correlation = 1.0 if col != self.names[0] else 0.0
 
-            summary[col] = {
+            summary[self.names[i]] = {
                 "Start Date": start_date.strftime("%Y-%m-%d"),
                 "End Date": end_date.strftime("%Y-%m-%d"),
                 "Duration (weeks)": f"{duration_weeks:.1f}",
-                "Exposure Time (%)": "100.00",
-                "Start Value": f"${start_value:,.2f}",
-                "Final Value": f"${final_value:,.2f}",
-                "Peak Value": f"${peak_value:,.2f}",
                 "Total Return (%)": f"{total_return * 100:.2f}%",
                 "Annualized Return (%)": f"{annual_return * 100:.2f}%",
                 "Annualized Volatility (%)": f"{annual_volatility * 100:.2f}%",
-                "Sharpe Ratio": f"{sharpe_ratio.values[0]:.2f}",
+                "Sharpe Ratio": f"{sharpe:.2f}",
+                "Sortino Ratio": f"{sortino:.2f}",
+                "Profit Factor": f"{pf:.2f}",
+                "Win Rate (%)": f"{winrate * 100:.2f}%",
                 "Correlation": f"{correlation:.2f}",
                 "Max Drawdown (%)": f"{max_drawdown * 100:.2f}%",
             }
@@ -186,7 +170,11 @@ class PerformanceReport:
             shared_xaxes=True,
             vertical_spacing=0.05,
             row_heights=[0.45, 0.3, 0.25],
-            subplot_titles=["Cumulative Return", "Drawdown", "Yearly Sharpe Ratio"],
+            subplot_titles=[
+                "Cumulative Return",
+                "Drawdown",
+                "Strategy Rolling Sharpe Ratio (6-Month)",
+            ],
             x_title="Date",
         )
 
@@ -197,27 +185,27 @@ class PerformanceReport:
                     x=self.cumulative.index,
                     y=self.cumulative[col] - 1,
                     mode="lines",
-                    name=col,
+                    name=self.names[i],
                     line=dict(color=colors[i % len(colors)], width=2),
                 ),
                 row=1,
                 col=1,
             )
 
-            final_value = self.cumulative[col].iloc[-1]
-            final_return = final_value - 1
+            # final_value = self.cumulative[col].iloc[-1]
+            # final_return = final_value - 1
 
-            fig.add_annotation(
-                x=self.cumulative.index[-1],
-                y=final_return,
-                text=f"{final_return:+.1%}",
-                showarrow=False,
-                font=dict(color=colors[i % len(colors)], size=12),
-                xanchor="left",
-                yanchor="bottom",
-                row=1,
-                col=1,
-            )
+            # fig.add_annotation(
+            #     x=self.cumulative.index[-1],
+            #     y=final_return,
+            #     text=f"{final_return:+.1%}",
+            #     showarrow=False,
+            #     font=dict(color=colors[i % len(colors)], size=12),
+            #     xanchor="left",
+            #     yanchor="bottom",
+            #     row=1,
+            #     col=1,
+            # )
 
         # Drawdown
         for i, col in enumerate(self.df.columns):
@@ -236,32 +224,52 @@ class PerformanceReport:
                 col=1,
             )
 
-        # Rolling Sharpe Ratio
-        annual_returns = (self.df + 1).resample("YE").prod() - 1
-        annual_std = self.df.resample("YE").std() * np.sqrt(252)  # Annualized std dev
-        sharpe_ratio = (
-            annual_returns - self._get_risk_free_rate().values[0]
-        ) / annual_std
+        # 6-Month Rolling Sharpe Ratio
+        rolling_window = 126  # 6 months of daily data
+        if len(self.df[self.names[0]]) < rolling_window:
+            raise ValueError(
+                f"Not enough data for rolling window of {rolling_window} periods."
+            )
+        ann_factor = self._get_annualization_factor()
+        rolling_sharpe = (
+            self.df[self.names[0]]
+            .rolling(window=rolling_window)
+            .apply(lambda x: sharpe_ratio(x, ann_factor))
+            .dropna()
+        )
 
         fig.add_trace(
-            go.Bar(
-                x=sharpe_ratio.index.year,
-                y=sharpe_ratio[self.strategy_name],
-                name=f"{self.strategy_name} Sharpe",
-                marker_color=benchmark_color,
+            go.Scatter(
+                x=rolling_sharpe.index,
+                y=rolling_sharpe,
+                mode="lines",
+                name=f"{self.names[0]} 1y Sharpe",
+                line=dict(color="grey", width=2),
                 showlegend=False,
             ),
             row=3,
             col=1,
         )
 
+        hline_value = sharpe_ratio(
+            self.df[self.names[0]],
+            ann_factor,
+        )
+
+        # Add horizontal line using add_hline, but include a dummy invisible scatter for hover
+        fig.add_hline(
+            y=hline_value,
+            line=dict(color="red", width=1, dash="dash"),
+            row=3,
+            col=1,
+        )
+
         # Layout
         fig.update_layout(
-            template="plotly_white",
             height=1000,
             width=1000,
             hovermode="x unified",
-            title_text=f"{self.strategy_name} Performance Report",
+            title_text=f"{self.names[0]} Performance Report",
             legend=dict(
                 orientation="h",
                 yanchor="bottom",
@@ -272,11 +280,18 @@ class PerformanceReport:
             ),
         )
 
-        fig.update_yaxes(title_text="Cumulative Return [%]", row=1, col=1)
-        fig.update_yaxes(tickformat=".0%", row=1, col=1)
-        fig.update_yaxes(title_text="Drawdown", tickformat=".0%", row=2, col=1)
         fig.update_yaxes(
-            title_text="Yearly Sharpe Ratio", tickformat=".2f", row=3, col=1
+            title_text="Cumulative Return [%]", tickformat=".0%", row=1, col=1
+        )
+        fig.update_yaxes(
+            range=[-1, 0], title_text="Drawdown", tickformat=".0%", row=2, col=1
+        )
+        fig.update_yaxes(
+            range=[-5, 10],
+            title_text="Yearly Sharpe Ratio",
+            tickformat=".2f",
+            row=3,
+            col=1,
         )
         fig.show()
 
@@ -292,18 +307,18 @@ class PerformanceReport:
         monthly["Month"] = monthly.index.month
 
         # Pivot to Year x Month
-        pivot = monthly.pivot(index="Year", columns="Month", values=self.strategy_name)
+        pivot = monthly.pivot(index="Year", columns="Month", values=self.names[0])
         pivot = pivot.reindex(columns=range(1, 13), fill_value=np.nan)
 
         # Annual return
-        annual_return = monthly.groupby("Year")[self.strategy_name].apply(
+        annual_return = monthly.groupby("Year")[self.names[0]].apply(
             lambda x: (1 + x).prod() - 1
         )
 
         # Add columns
         pivot[""] = np.nan  # Placeholder for empty column
         pivot["Annual Return"] = annual_return
-        pivot["Max Drawdown"] = monthly.groupby("Year")[self.strategy_name].apply(
+        pivot["Max Drawdown"] = monthly.groupby("Year")[self.names[0]].apply(
             lambda x: (1 + x).cumprod().div((1 + x).cumprod().cummax()).min() - 1
         )
         pivot.sort_index(ascending=False, inplace=True)
@@ -337,7 +352,7 @@ class PerformanceReport:
                 "forestgreen",
             ],  # Use a continuous diverging color scale
             aspect="auto",
-            title=f"{self.strategy_name} Monthly Returns",
+            title=f"{self.names[0]} Monthly Returns",
             text_auto=".1%",
             zmin=-0.2,  # adjust as needed for your data range
             zmax=0.2,  # adjust as needed for your data range

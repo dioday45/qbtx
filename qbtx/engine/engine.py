@@ -1,7 +1,6 @@
 from abc import ABC, abstractmethod
-from typing import Dict, Optional, Union
+from typing import Any, Dict, List, Optional
 
-import numpy as np
 import pandas as pd
 from tqdm import tqdm
 
@@ -9,8 +8,12 @@ from tqdm import tqdm
 class Strategy(ABC):
     """Abstract base class for trading strategies."""
 
-    def __init__(self, **kwargs):
-        """Initialize strategy with parameters."""
+    def __init__(self, **kwargs) -> None:
+        """Initialize strategy with parameters.
+
+        Args:
+            **kwargs: Arbitrary keyword arguments for strategy parameters.
+        """
         self.params = kwargs
 
     @abstractmethod
@@ -21,12 +24,12 @@ class Strategy(ABC):
         are based only on information available at each point in time.
 
         Args:
-            data: DataFrame containing price data for a single asset
+            data: DataFrame containing price data for a single asset.
 
         Returns:
-            pd.Series: Series containing actionable position sizes (1, 0, -1 or custom sizing)
-                      These signals represent positions that can be taken immediately
-                      (i.e., look-ahead bias has already been handled)
+            pd.Series: Series containing actionable position sizes (1, 0, -1 or custom sizing).
+                       These signals represent positions that can be taken immediately
+                       (i.e., look-ahead bias has already been handled).
         """
         pass
 
@@ -34,33 +37,53 @@ class Strategy(ABC):
 class Portfolio:
     """Portfolio class containing multiple assets and their data."""
 
-    def __init__(self, assets: Dict[str, pd.DataFrame]):
+    def __init__(self, assets: Dict[str, pd.DataFrame]) -> None:
         """Initialize portfolio with asset data.
 
         Args:
-            assets: Dictionary mapping ticker symbols to their price DataFrames
+            assets: Dictionary mapping ticker symbols to their price DataFrames.
         """
         self.assets = assets
         self.tickers = list(assets.keys())
 
-    def add_asset(self, ticker: str, data: pd.DataFrame):
-        """Add a new asset to the portfolio."""
+    def add_asset(self, ticker: str, data: pd.DataFrame) -> None:
+        """Add a new asset to the portfolio.
+
+        Args:
+            ticker: Ticker symbol of the asset.
+            data: Price DataFrame of the asset.
+        """
         self.assets[ticker] = data
         if ticker not in self.tickers:
             self.tickers.append(ticker)
 
-    def remove_asset(self, ticker: str):
-        """Remove an asset from the portfolio."""
+    def remove_asset(self, ticker: str) -> None:
+        """Remove an asset from the portfolio.
+
+        Args:
+            ticker: Ticker symbol of the asset to remove.
+        """
         if ticker in self.assets:
             del self.assets[ticker]
             self.tickers.remove(ticker)
 
-    def get_asset_data(self, ticker: str) -> pd.DataFrame:
-        """Get data for a specific asset."""
+    def get_asset_data(self, ticker: str) -> Optional[pd.DataFrame]:
+        """Get data for a specific asset.
+
+        Args:
+            ticker: Ticker symbol of the asset.
+
+        Returns:
+            pd.DataFrame or None: Price DataFrame of the asset if found, else None.
+        """
         return self.assets.get(ticker)
 
-    def get_all_tickers(self) -> list:
-        """Get list of all tickers in the portfolio."""
+    def get_all_tickers(self) -> List[str]:
+        """Get list of all tickers in the portfolio.
+
+        Returns:
+            List[str]: List of ticker symbols.
+        """
         return self.tickers.copy()
 
 
@@ -73,7 +96,15 @@ class TradeLog:
         positions: pd.Series,
         fee: float = 0.0005,
         slippage: float = 0.001,
-    ):
+    ) -> None:
+        """Initialize TradeLog with prices, positions, and cost parameters.
+
+        Args:
+            prices: Series of asset prices indexed by time.
+            positions: Series of position sizes indexed by time.
+            fee: Transaction fee rate.
+            slippage: Slippage rate.
+        """
         self.prices = prices
         self.positions = positions
         self.fee = fee
@@ -81,7 +112,26 @@ class TradeLog:
         self.trades = self._generate_trades()
 
     def _generate_trades(self) -> pd.DataFrame:
-        """Generate individual trades from position series."""
+        """Generate individual trades from position series.
+
+        Identifies trade entry and exit points, calculates gross and net returns,
+        and records trade details including fees, slippage, duration, and direction.
+
+        Returns:
+            pd.DataFrame: DataFrame with one row per completed trade containing columns:
+                - entry_time: Timestamp of trade entry.
+                - exit_time: Timestamp of trade exit.
+                - entry_price: Price at entry.
+                - exit_price: Price at exit.
+                - position_size: Size of the position taken.
+                - gross_return: Gross return of the trade in percentage.
+                - net_return: Net return after costs in percentage.
+                - fee_paid: Total fees paid for the trade.
+                - slippage_paid: Total slippage cost for the trade.
+                - total_cost: Sum of fees and slippage.
+                - duration: Duration of the trade in days.
+                - direction: 'long' or 'short' depending on position.
+        """
         trades = []
         pos = self.positions.fillna(0)
         current_position = 0
@@ -98,6 +148,16 @@ class TradeLog:
                 if current_position != 0:
                     exit_time = time
                     exit_price = price
+
+                    # Skip trade if entry or exit price is NaN to avoid invalid calculations
+                    if pd.isna(entry_price) or pd.isna(exit_price):
+                        current_position = p
+                        if p != 0:
+                            entry_time = time
+                            entry_price = price
+                        else:
+                            entry_time, entry_price = None, None
+                        continue
 
                     # Calculate returns
                     if current_position > 0:  # Long position
@@ -140,13 +200,19 @@ class TradeLog:
                 if p != 0:
                     entry_time = time
                     entry_price = price
+                else:
+                    entry_time, entry_price = None, None
 
                 current_position = p
 
         return pd.DataFrame(trades)
 
     def get_trades(self) -> pd.DataFrame:
-        """Return the trades DataFrame."""
+        """Return the DataFrame of completed trades.
+
+        Returns:
+            pd.DataFrame: DataFrame containing trade details.
+        """
         return self.trades
 
 
@@ -160,19 +226,34 @@ class AssetBacktest:
         strategy: Strategy,
         slippage: float = 0.0,
         fee: float = 0.0,
-    ):
+    ) -> None:
+        """Initialize AssetBacktest with asset data and strategy.
+
+        Args:
+            ticker: Ticker symbol of the asset.
+            data: Price DataFrame of the asset.
+            strategy: Strategy instance to generate signals.
+            slippage: Slippage rate.
+            fee: Transaction fee rate.
+        """
         self.ticker = ticker
         self.data = data
         self.strategy = strategy
         self.slippage = slippage
         self.fee = fee
-        self.signals = None
-        self.positions = None
-        self.returns = None
-        self.trade_log = None
+        self.signals: Optional[pd.Series] = None
+        self.positions: Optional[pd.Series] = None
+        self.returns: Optional[pd.Series] = None
+        self.trade_log: Optional[TradeLog] = None
 
-    def run(self):
-        """Run the backtest for this asset."""
+    def run(self) -> "AssetBacktest":
+        """Run the backtest for this asset.
+
+        Generates signals, computes positions, calculates returns, and creates trade log.
+
+        Returns:
+            AssetBacktest: Self for chaining.
+        """
         # Generate signals (already lag-adjusted by strategy)
         self.signals = self.strategy.run(self.data.copy())
 
@@ -194,7 +275,14 @@ class AssetBacktest:
         return self
 
     def _compute_returns(self, price_col: str) -> pd.Series:
-        """Compute returns for this asset."""
+        """Compute returns for this asset.
+
+        Args:
+            price_col: Name of the price column in data.
+
+        Returns:
+            pd.Series: Series of net returns indexed by time.
+        """
         price_returns = self.data[price_col].pct_change().fillna(0)
 
         # Gross returns
@@ -217,19 +305,32 @@ class Backtester:
         self,
         portfolio: Portfolio,
         strategy: Strategy,
-        strategy_kwargs: Optional[Dict] = None,
+        strategy_kwargs: Optional[Dict[str, Any]] = None,
         slippage: float = 0.0,
         fee: float = 0.0,
-    ):
+    ) -> None:
+        """Initialize Backtester with portfolio, strategy, and cost parameters.
+
+        Args:
+            portfolio: Portfolio instance containing assets.
+            strategy: Strategy class (not instance) to instantiate per asset.
+            strategy_kwargs: Optional dict of keyword arguments for strategy initialization.
+            slippage: Slippage rate.
+            fee: Transaction fee rate.
+        """
         self.portfolio = portfolio
         self.strategy = strategy
         self.strategy_kwargs = strategy_kwargs or {}
         self.slippage = slippage
         self.fee = fee
-        self.asset_backtests = {}
+        self.asset_backtests: Dict[str, AssetBacktest] = {}
 
-    def run(self):
-        """Run backtests for all assets in the portfolio."""
+    def run(self) -> "Backtester":
+        """Run backtests for all assets in the portfolio.
+
+        Returns:
+            Backtester: Self for chaining.
+        """
         for ticker in tqdm(self.portfolio.get_all_tickers(), desc="Running backtests"):
             data = self.portfolio.get_asset_data(ticker)
             strategy = self.strategy(**self.strategy_kwargs)
@@ -246,8 +347,13 @@ class Backtester:
 
         return self
 
-    def get_results(self) -> Dict:
-        """Get comprehensive results for all assets."""
+    def get_results(self) -> Dict[str, Any]:
+        """Get comprehensive results for all assets.
+
+        Returns:
+            Dict[str, Any]: Dictionary mapping ticker symbols to their backtest results,
+                            including returns, trades, trade statistics, signals, and positions.
+        """
         results = {}
 
         for ticker, backtest in self.asset_backtests.items():
@@ -264,8 +370,15 @@ class Backtester:
 
         return results
 
-    def get_combined_results(self) -> Dict:
-        """Get results for the combined portfolio."""
+    def get_combined_results(self) -> Dict[str, Any]:
+        """Get results for the combined portfolio.
+
+        Combines returns and trades across all assets and computes aggregate statistics.
+
+        Returns:
+            Dict[str, Any]: Dictionary containing combined portfolio returns,
+                            all trades, combined trade statistics, and individual results.
+        """
         # Combine all returns
         all_returns = pd.DataFrame(
             {
@@ -279,17 +392,18 @@ class Backtester:
         portfolio_returns.index = pd.to_datetime(portfolio_returns.index)
 
         # All trades combined
-        all_trades = pd.concat(
-            [
-                backtest.trade_log.get_trades().assign(ticker=ticker)
-                for ticker, backtest in self.asset_backtests.items()
-            ],
-            ignore_index=True,
-        )
+        trades_list = [
+            backtest.trade_log.get_trades().assign(ticker=ticker)
+            for ticker, backtest in self.asset_backtests.items()
+            if not backtest.trade_log.get_trades().empty
+        ]
 
-        combined_trade_stats = (
-            evaluate_trade_log(all_trades) if len(all_trades) > 0 else pd.DataFrame()
-        )
+        if trades_list:
+            all_trades = pd.concat(trades_list, ignore_index=True)
+            combined_trade_stats = evaluate_trade_log(all_trades)
+        else:
+            all_trades = pd.DataFrame()
+            combined_trade_stats = pd.DataFrame()
 
         return {
             "returns": portfolio_returns,
@@ -299,37 +413,15 @@ class Backtester:
         }
 
 
-def evaluate_returns(
-    returns: Union[pd.Series, pd.DataFrame], freq: int = 252
-) -> pd.DataFrame:
-    """Evaluate portfolio-level returns."""
-    if isinstance(returns, pd.Series):
-        returns = returns.to_frame()
-
-    total_return = (1 + returns).prod() - 1
-    annual_return = (1 + total_return) ** (freq / len(returns)) - 1
-    volatility = returns.std() * np.sqrt(freq)
-    sharpe = annual_return / volatility.replace(0, np.nan)
-
-    # Calculate max drawdown
-    cumulative = (1 + returns).cumprod()
-    running_max = cumulative.cummax()
-    drawdown = (cumulative - running_max) / running_max
-    max_drawdown = drawdown.min()
-
-    return pd.DataFrame(
-        {
-            "Total Return": total_return,
-            "Annualized Return": annual_return,
-            "Volatility": volatility,
-            "Sharpe Ratio": sharpe,
-            "Max Drawdown": max_drawdown,
-        }
-    )
-
-
 def evaluate_trade_log(trades: pd.DataFrame) -> pd.DataFrame:
-    """Evaluate a DataFrame of trades."""
+    """Evaluate a DataFrame of trades and compute summary statistics.
+
+    Args:
+        trades: DataFrame containing trade details with 'gross_return' and 'net_return' columns.
+
+    Returns:
+        pd.DataFrame: DataFrame with summary metrics as rows and their values.
+    """
     if len(trades) == 0:
         return pd.DataFrame()
 

@@ -214,3 +214,4 @@ __marimo__/
 data/*
 notebooks/sandbox.ipynb
 notebooks/strategies/continuous_returns.ipynb
+notebooks/strategies/trends/continuous_returns.ipynb

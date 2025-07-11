@@ -2,8 +2,6 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import seaborn as sns
 
-sns.set_theme(style="whitegrid")
-
 
 class MonteCarloSimulator:
     def __init__(self, returns: pd.Series, num_simulations: int = 100):
@@ -169,8 +167,7 @@ class MonteCarloSimulator:
             raise ValueError("fraction must be between 0 (exclusive) and 1 (inclusive)")
 
         plt.figure(figsize=(12, 6))
-        sns.set(style="whitegrid")
-
+        sns.set_theme(style="white")
         # Sample simulations
         n_simulations = int(len(simulated_returns.columns) * fraction)
         sampled_columns = simulated_returns.columns.to_list()
@@ -187,7 +184,7 @@ class MonteCarloSimulator:
 
         for column in cumulative_returns.columns:
             sns.lineplot(
-                data=cumulative_returns[column], alpha=0.5, linewidth=1, legend=False
+                data=cumulative_returns[column], alpha=0.8, linewidth=1, legend=False
             )
 
         if original_returns is not None:
@@ -198,7 +195,7 @@ class MonteCarloSimulator:
                 label="Original Strategy",
                 linewidth=1,
             )
-
+        plt.legend(loc="upper left")
         plt.title("Monte Carlo Simulations of Cumulative Returns")
         plt.xlabel("Time")
         plt.ylabel("Cumulative Return (%)")
